@@ -529,47 +529,198 @@
         }
 
         // 对比模式
-        function addCritField(n, w) {
-            const div = document.createElement('div'); div.className = 'crit-card';
-            div.innerHTML = `<div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+        // function addCritField(n, w) {
+        //     const div = document.createElement('div'); div.className = 'crit-card';
+        //     div.innerHTML = `<div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+        //     <input type="text" class="c-n" value="${n}" placeholder="标准(如：价格)" oninput="checkLen(this, 30)" style="border:none; background:none; outline:none; font-weight:bold; width:80%;">
+        //     <span class="del-btn" onclick="removeCrit(this)">✕</span></div>
+        //     <div style="font-size:11px; display:flex; gap:10px; align-items:center;">权重: <input type="range" class="c-w" value="${w}" style="flex:1" oninput="this.nextElementSibling.innerText=this.value+'%'"><span>${w}%</span></div>`;
+        //     document.getElementById('crit-list').appendChild(div);
+        // }
+        // function removeCrit(el) { if (canDelete('crit-list', 1)) el.closest('.crit-card').remove(); }
+
+        function addCritField(n = "", w = 50) {
+            const div = document.createElement('div');
+            div.className = 'crit-card'; // 恢复原本的类名
+            div.innerHTML = `
+        <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
             <input type="text" class="c-n" value="${n}" placeholder="标准(如：价格)" oninput="checkLen(this, 30)" style="border:none; background:none; outline:none; font-weight:bold; width:80%;">
-            <span class="del-btn" onclick="removeCrit(this)">✕</span></div>
-            <div style="font-size:11px; display:flex; gap:10px; align-items:center;">权重: <input type="range" class="c-w" value="${w}" style="flex:1" oninput="this.nextElementSibling.innerText=this.value+'%'"><span>${w}%</span></div>`;
+            <span class="del-btn" onclick="removeCrit(this)">✕</span>
+        </div>
+        <div style="font-size:11px; display:flex; gap:10px; align-items:center;">
+            权重: <input type="range" class="c-w" value="${w}" style="flex:1" oninput="this.nextElementSibling.innerText=this.value+'%'">
+            <span>${w}%</span>
+        </div>`;
             document.getElementById('crit-list').appendChild(div);
         }
-        function removeCrit(el) { if (canDelete('crit-list', 1)) el.closest('.crit-card').remove(); }
 
-        function addObjField(n) {
-            const div = document.createElement('div'); div.className = 'input-group';
-            div.innerHTML = `<input type="text" class="o-n" value="${n}" placeholder="对象名(如：小米)" oninput="checkLen(this, 30)" style="flex:1;">
-            <span class="del-btn" onclick="removeObj(this)">✕</span>`;
+        // 对应的删除保护逻辑
+        function removeCrit(el) {
+            // 获取当前页面上所有评价标准的数量
+            const count = document.querySelectorAll('.crit-card').length;
+            if (count <= 1) {
+                alert("⚖️ 请至少保留一个评价标准。");
+                return;
+            }
+            el.closest('.crit-card').remove();
+        }
+        // function addObjField(n) {
+        //     const div = document.createElement('div'); div.className = 'input-group';
+        //     div.innerHTML = `<input type="text" class="o-n" value="${n}" placeholder="对象名(如：小米)" oninput="checkLen(this, 30)" style="flex:1;">
+        //     <span class="del-btn" onclick="removeObj(this)">✕</span>`;
+        //     document.getElementById('obj-list').appendChild(div);
+        // }
+
+        // function removeObj(el) { if (canDelete('obj-list', 2)) el.closest('.input-group').remove(); }
+        function addObjField(n = "") {
+            const div = document.createElement('div');
+            div.className = 'input-group';
+            div.innerHTML = `
+        <input type="text" class="o-n" value="${n}" placeholder="对象名称" oninput="checkLen(this, 12)" style="flex:1">
+        <span class="del-btn" onclick="removeObj(this)">✕</span>
+    `;
             document.getElementById('obj-list').appendChild(div);
         }
-        function removeObj(el) { if (canDelete('obj-list', 2)) el.closest('.input-group').remove(); }
 
+        function removeObj(el) {
+            if (document.querySelectorAll('.o-n').length <= 2) {
+                alert("⚠️ 至少需要两个比较对象才能进行对比。");
+                return;
+            }
+            el.closest('.input-group').remove();
+        }
         function toggleScoring(show) { document.getElementById('adv-setup').classList.toggle('hidden', show); document.getElementById('adv-scoring-ui').classList.toggle('hidden', !show); }
 
-        function goScoringPage() {
-            const crits = [...document.querySelectorAll('.c-n')].map((el, i) => ({ n: el.value, w: document.querySelectorAll('.c-w')[i].value }));
-            const objs = [...document.querySelectorAll('.o-n')].map(el => el.value);
-            if (objs.length < 2) return alert("至少两个对象才能对比哦");
+        // function goScoringPage() {
+        //     const crits = [...document.querySelectorAll('.c-n')].map((el, i) => ({ n: el.value, w: document.querySelectorAll('.c-w')[i].value }));
+        //     const objs = [...document.querySelectorAll('.o-n')].map(el => el.value);
+        //     if (objs.length < 2) return alert("至少两个对象才能对比哦");
 
-            document.getElementById('scoring-matrix').innerHTML = objs.map((o, oi) => `<div class="crit-card"><h4 style="margin:0 0 10px; color:var(--primary)">对 ${o} 打分</h4>
+        //     document.getElementById('scoring-matrix').innerHTML = objs.map((o, oi) => `<div class="crit-card"><h4 style="margin:0 0 10px; color:var(--primary)">对 ${o} 打分</h4>
+        //     ${crits.map((c, ci) => {
+        //         const s = currentMatrixData[`${oi}-${ci}`] || 3;
+        //         return `<div style="margin-bottom:12px; font-size:12px; color:#666;">${c.n} (${c.w}%权重)
+        //             <div class="star-group" data-o="${oi}" data-c="${ci}" data-score="${s}">${[1, 2, 3, 4, 5].map(v => `<div class="star-box ${v <= s ? 'active' : ''}" onclick="setStar(this, ${v})">★</div>`).join('')}</div>
+        //         </div>`}).join('')}</div>`).join('');
+        //     toggleScoring(true);
+        // }
+
+        // function goScoringPage() {
+        //     // 1. 获取对象和标准
+        //     const objs = [...document.querySelectorAll('.o-n')].map(el => el.value.trim()).filter(v => v);
+        //     const crits = [...document.querySelectorAll('.c-n')].map((el, i) => {
+        //         const weightEl = document.querySelectorAll('.c-w')[i];
+        //         return {
+        //             n: el.value.trim(),
+        //             w: weightEl ? parseInt(weightEl.value) || 0 : 0
+        //         };
+        //     }).filter(c => c.n !== "");
+
+        //     // 2. 严格拦截
+        //     if (objs.length < 2) {
+        //         alert("⚠️ 至少需要两个比较对象。");
+        //         return;
+        //     }
+        //     if (crits.length < 1) {
+        //         alert("⚖️ 请至少添加一个评价标准。");
+        //         return;
+        //     }
+
+        //     // 3. 渲染打分矩阵
+        //     const matrix = document.getElementById('scoring-matrix');
+        //     matrix.innerHTML = objs.map((o, oi) => `
+        // <div class="crit-card">
+        //     <h4 style="margin:0 0 10px; color:var(--primary)">对 ${o} 打分</h4>
+        //     ${crits.map((c, ci) => {
+        //         const s = currentMatrixData[`${oi}-${ci}`] || 3;
+        //         return `
+        //         <div style="margin-bottom:12px; font-size:12px; color:#666;">${c.n} (${c.w}%权重)
+        //             <div class="star-group" data-o="${oi}" data-c="${ci}" data-score="${s}">
+        //                 ${[1, 2, 3, 4, 5].map(v => `<div class="star-box ${v <= s ? 'active' : ''}" onclick="setStar(this, ${v})">★</div>`).join('')}
+        //             </div>
+        //         </div>`
+        //     }).join('')}
+        // </div>`).join('');
+
+        //     toggleScoring(true);
+        // }
+
+        function goScoringPage() {
+            // --- 核心修复：重置状态 ---
+            currentMatrixData = {}; // 清空之前的打分数据
+            const resPanel = document.getElementById('adv-res-panel');
+            if (resPanel) {
+                resPanel.innerHTML = "";     // 清空上一次的计算结果文字
+                resPanel.classList.add('hidden'); // 隐藏结果面板
+            }
+            // -----------------------
+
+            const objs = [...document.querySelectorAll('.o-n')].map(el => el.value.trim()).filter(v => v);
+            const crits = [...document.querySelectorAll('.c-n')].map((el, i) => {
+                const weightEl = document.querySelectorAll('.c-w')[i];
+                return {
+                    n: el.value.trim(),
+                    w: weightEl ? parseInt(weightEl.value) || 0 : 0
+                };
+            }).filter(c => c.n !== "");
+
+            if (objs.length < 2) {
+                alert("⚠️ 至少需要两个比较对象。");
+                return;
+            }
+            if (crits.length < 1) {
+                alert("⚖️ 请至少添加一个评价标准。");
+                return;
+            }
+
+            // 渲染打分矩阵
+            const matrix = document.getElementById('scoring-matrix');
+            matrix.innerHTML = objs.map((o, oi) => `
+        <div class="crit-card">
+            <h4 style="margin:0 0 10px; color:var(--primary)">对 ${o} 打分</h4>
             ${crits.map((c, ci) => {
-                const s = currentMatrixData[`${oi}-${ci}`] || 3;
-                return `<div style="margin-bottom:12px; font-size:12px; color:#666;">${c.n} (${c.w}%权重)
-                    <div class="star-group" data-o="${oi}" data-c="${ci}" data-score="${s}">${[1, 2, 3, 4, 5].map(v => `<div class="star-box ${v <= s ? 'active' : ''}" onclick="setStar(this, ${v})">★</div>`).join('')}</div>
-                </div>`}).join('')}</div>`).join('');
+                // 默认分数为 3
+                const s = 3;
+                currentMatrixData[`${oi}-${ci}`] = s; // 同步初始化数据
+                return `
+                <div style="margin-bottom:12px; font-size:12px; color:#666;">${c.n} (${c.w}%权重)
+                    <div class="star-group" data-o="${oi}" data-c="${ci}" data-score="${s}">
+                        ${[1, 2, 3, 4, 5].map(v => `<div class="star-box ${v <= s ? 'active' : ''}" onclick="setStar(this, ${v})">★</div>`).join('')}
+                    </div>
+                </div>`
+            }).join('')}
+        </div>`).join('');
+
             toggleScoring(true);
         }
 
         // 随机模式
-        function addRanField(v) {
-            const div = document.createElement('div'); div.className = 'input-group';
-            div.innerHTML = `<input type="text" class="r-i" value="${v}" placeholder="选项" oninput="checkLen(this, 30)" style="flex:1"><span class="del-btn" onclick="removeRan(this)">✕</span>`;
+        // function addRanField(v) {
+        //     const div = document.createElement('div'); div.className = 'input-group';
+        //     div.innerHTML = `<input type="text" class="r-i" value="${v}" placeholder="选项" oninput="checkLen(this, 30)" style="flex:1"><span class="del-btn" onclick="removeRan(this)">✕</span>`;
+        //     document.getElementById('ran-list').appendChild(div);
+        // }
+        // function removeRan(el) { if (canDelete('ran-list', 2)) el.closest('.input-group').remove(); }
+
+        function addRanField(v = "") {
+            const div = document.createElement('div');
+            div.className = 'input-group';
+            // 关键：保留你的 span 标签和 del-btn 类名，只修改 onclick
+            div.innerHTML = `
+        <input type="text" class="r-i" value="${v}" placeholder="选项" oninput="checkLen(this, 30)" style="flex:1">
+        <span class="del-btn" onclick="removeRan(this)">✕</span>
+    `;
             document.getElementById('ran-list').appendChild(div);
         }
-        function removeRan(el) { if (canDelete('ran-list', 2)) el.closest('.input-group').remove(); }
+
+        function removeRan(el) {
+            // 检查 .r-i 的数量是否小于等于 2
+            if (document.querySelectorAll('.r-i').length <= 2) {
+                alert("🎰 至少需要保留两个选项，否则无法开启随机决策。");
+                return;
+            }
+            el.closest('.input-group').remove();
+        }
 
         // 通用打分
         function setStar(el, v) {
@@ -668,7 +819,7 @@
             </div>
             `;
             }
-            
+
             saveToDb('balance', document.getElementById('bal-title').value, true);
         }
 
@@ -742,13 +893,73 @@
             saveToDb('advanced', document.getElementById('adv-title').value, true);
         }
 
+        // function doRandomDecision() {
+        //     const opts = [...document.querySelectorAll('.r-i')].map(el => el.value).filter(v => v);
+        //     if (opts.length < 2) return alert("两个以上选项才能开启随机决策");
+
+        //     const track = document.getElementById('ran-track');
+        //     document.getElementById('ran-machine').classList.remove('hidden');
+
+        //     track.innerHTML = Array(15).fill(opts).flat().map(o =>
+        //         `<div style="height:80px; line-height:80px; text-align:center; color:white; font-weight:bold; font-size:1.2rem;">${o}</div>`
+        //     ).join('');
+
+        //     const winIdx = Math.floor(Math.random() * opts.length);
+        //     track.style.transition = 'none';
+        //     track.style.transform = 'translateY(0)';
+
+        //     setTimeout(() => {
+        //         track.style.transition = 'transform 3s cubic-bezier(0.1, 0, 0.1, 1)';
+        //         track.style.transform = `translateY(-${(opts.length * 12 + winIdx) * 80}px)`;
+        //     }, 50);
+
+        //     // 动画结束后的处理逻辑
+        //     setTimeout(() => {
+        //         const resPanel = document.getElementById('ran-res-panel');
+        //         const title = document.getElementById('ran-title').value.trim();
+        //         const winner = opts[winIdx];
+
+        //         // 1. 渲染核心结果
+        //         let html = `<div style="font-size:1.2rem; font-weight:bold;">✨ 决策结果：${winner}</div>`;
+
+        //         // 2. 【新增】柔性提示：如果标题为空，追加提示小字
+        //         if (!title) {
+        //             html += `
+        //         <div style="margin-top:15px; padding-top:10px; border-top:1px dashed #eee; font-size:11px; color:#aaa; text-align:center;">
+        //         💡 温馨提示：当前未输入标题，本次结果将不会自动保存到历史记录。
+        //         </div>
+        //         `;
+        //         }
+
+        //         resPanel.innerHTML = html;
+
+        //         // 3. 执行保存逻辑
+        //         saveToDb('random', title, true);
+        //     }, 3100);
+        // }
+
         function doRandomDecision() {
-            const opts = [...document.querySelectorAll('.r-i')].map(el => el.value).filter(v => v);
-            if (opts.length < 2) return alert("两个以上选项才能开启随机决策");
+            // 1. 严格检查选项数量
+            const opts = [...document.querySelectorAll('.r-i')].map(el => el.value.trim()).filter(v => v);
+            if (opts.length < 2) {
+                alert("🎰 两个以上选项才能开启随机决策");
+                return; // 拦截并退出
+            }
 
+            // 2. 获取必要的 DOM 元素
             const track = document.getElementById('ran-track');
-            document.getElementById('ran-machine').classList.remove('hidden');
+            const machine = document.getElementById('ran-machine');
+            const resPanel = document.getElementById('ran-res-panel');
+            const titleInput = document.getElementById('ran-title');
 
+            if (!track || !machine) return;
+
+            // 3. 初始化界面状态
+            machine.classList.remove('hidden');
+            resPanel.innerHTML = ""; // 清空旧结果
+            resPanel.classList.add('hidden'); // 动画期间隐藏结果面板
+
+            // 4. 构建转盘内容
             track.innerHTML = Array(15).fill(opts).flat().map(o =>
                 `<div style="height:80px; line-height:80px; text-align:center; color:white; font-weight:bold; font-size:1.2rem;">${o}</div>`
             ).join('');
@@ -757,32 +968,26 @@
             track.style.transition = 'none';
             track.style.transform = 'translateY(0)';
 
+            // 5. 启动动画
             setTimeout(() => {
                 track.style.transition = 'transform 3s cubic-bezier(0.1, 0, 0.1, 1)';
                 track.style.transform = `translateY(-${(opts.length * 12 + winIdx) * 80}px)`;
             }, 50);
 
-            // 动画结束后的处理逻辑
+            // 6. 结果处理
             setTimeout(() => {
-                const resPanel = document.getElementById('ran-res-panel');
-                const title = document.getElementById('ran-title').value.trim();
                 const winner = opts[winIdx];
+                const title = titleInput ? titleInput.value.trim() : "";
 
-                // 1. 渲染核心结果
                 let html = `<div style="font-size:1.2rem; font-weight:bold;">✨ 决策结果：${winner}</div>`;
-
-                // 2. 【新增】柔性提示：如果标题为空，追加提示小字
                 if (!title) {
-                    html += `
-                <div style="margin-top:15px; padding-top:10px; border-top:1px dashed #eee; font-size:11px; color:#aaa; text-align:center;">
-                💡 温馨提示：当前未输入标题，本次结果将不会自动保存到历史记录。
-                </div>
-                `;
+                    html += `<div style="margin-top:15px; padding-top:10px; border-top:1px dashed #eee; font-size:11px; color:#aaa; text-align:center;">💡 温馨提示：当前未输入标题，本次结果将不会自动保存。</div>`;
                 }
 
                 resPanel.innerHTML = html;
+                resPanel.classList.remove('hidden'); // 显示结果
 
-                // 3. 执行保存逻辑
+                // 触发存档
                 saveToDb('random', title, true);
             }, 3100);
         }
