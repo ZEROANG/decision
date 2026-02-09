@@ -318,7 +318,7 @@
                     <p style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">吃什么买什么？交给概率来定夺。</p>
                 </div><span style="color:#ddd; font-size:24px;">›</span>
             </div>
-            <div style="text-align:center; color:#eee; font-size:12px; margin-top:30px;">版本号：1.0.0</div>
+            <div style="text-align:center; color:#eee; font-size:12px; margin-top:30px;">版本号：1.0.1</div>
 
         </div>
 
@@ -440,36 +440,96 @@
             return document.getElementById(containerId).children.length > min;
         }
 
-        function saveToDb(type, title, isFinal = false) {
-            if (!title) return;
-            const snapshot = getSnapshot(type);
-            let idx = db.findIndex(item => item.id === activeId);
+        // function saveToDb(type, title, isFinal = false) {
+        //     if (!title) return;
+        //     const snapshot = getSnapshot(type);
+        //     let idx = db.findIndex(item => item.id === activeId);
 
-            let finalTitle = title;
-            // 只有在 isFinal 为 true（失去焦点或手动保存）时才执行重名检查和改名
-            if (isFinal) {
-                let counter = 1;
-                while (db.some(item => item.title === finalTitle && item.id !== activeId)) {
-                    finalTitle = `${title}(${counter})`;
-                    counter++;
+        //     let finalTitle = title;
+        //     // 只有在 isFinal 为 true（失去焦点或手动保存）时才执行重名检查和改名
+        //     if (isFinal) {
+        //         let counter = 1;
+        //         while (db.some(item => item.title === finalTitle && item.id !== activeId)) {
+        //             finalTitle = `${title}(${counter})`;
+        //             counter++;
+        //         }
+        //         // 更新 UI
+        //         const inputEl = document.getElementById(`${type.substring(0, 3)}-title`);
+        //         if (inputEl) inputEl.value = finalTitle;
+        //     }
+
+        //     if (idx !== -1) {
+        //         db[idx].title = finalTitle; // 这里使用处理后的名字
+        //         db[idx].time = new Date().toLocaleString();
+        //         db[idx].data = snapshot;
+        //     } else {
+        //         const nr = { id: Date.now(), type, title: finalTitle, time: new Date().toLocaleString(), count: 0, data: snapshot };
+        //         db.unshift(nr);
+        //         activeId = nr.id;
+        //     }
+
+        //     localStorage.setItem('terminal_db_vfinal', JSON.stringify(db));
+        //     if (typeof renderHistory === 'function') renderHistory();
+        // }
+
+        function saveToDb(type, title, isFinal) {
+            // 只有在 isFinal 为 true（点击按钮）时才执行保存
+            if (!isFinal) return;
+
+            // 1. 处理未命名情况
+            let finalTitle = title.trim() || "未命名决策";
+
+            // 2. 获取当前模式的数据快照
+            let data = {};
+            if (type === 'balance') {
+                data = {
+                    pros: [...document.querySelectorAll('.p-i')].map(el => el.value),
+                    cons: [...document.querySelectorAll('.c-i')].map(el => el.value),
+                    res: document.getElementById('bal-res-panel').innerText
+                };
+            } else if (type === 'advanced') {
+                data = {
+                    crits: [...document.querySelectorAll('.c-n')].map((el, i) => ({ n: el.value, w: document.querySelectorAll('.c-w')[i].value })),
+                    objs: [...document.querySelectorAll('.o-n')].map(el => el.value),
+                    matrix: { ...currentMatrixData },
+                    res: document.getElementById('adv-res-panel').innerText
+                };
+            } else if (type === 'random') {
+                data = {
+                    opts: [...document.querySelectorAll('.r-i')].map(el => el.value),
+                    res: document.getElementById('ran-res-panel').innerText
+                };
+            }
+
+            // 3. 查找是否存在同名记录（用于替换逻辑）
+            // 注意：这里的 currentHistoryId 是你在 loadHistory 时保存的那个原始 ID
+            const existingIndex = db.findIndex(item => item.title === finalTitle);
+
+            if (existingIndex !== -1) {
+                // 如果标题没变，且这个标题对应的就是当前打开的这条记录，则替换
+                // 如果标题没变，但当前是新建状态，则触发“重名加序号”另存为
+                if (window.currentOpeningTitle === finalTitle) {
+                    db[existingIndex] = { id: Date.now(), type, title: finalTitle, data, time: new Date().toLocaleString() };
+                } else {
+                    // 重名处理：另存为“标题(1)”
+                    let count = 1;
+                    let newTitle = `${finalTitle}(${count})`;
+                    while (db.some(item => item.title === newTitle)) {
+                        count++;
+                        newTitle = `${finalTitle}(${count})`;
+                    }
+                    db.unshift({ id: Date.now(), type, title: newTitle, data, time: new Date().toLocaleString() });
                 }
-                // 更新 UI
-                const inputEl = document.getElementById(`${type.substring(0, 3)}-title`);
-                if (inputEl) inputEl.value = finalTitle;
-            }
-
-            if (idx !== -1) {
-                db[idx].title = finalTitle; // 这里使用处理后的名字
-                db[idx].time = new Date().toLocaleString();
-                db[idx].data = snapshot;
             } else {
-                const nr = { id: Date.now(), type, title: finalTitle, time: new Date().toLocaleString(), count: 0, data: snapshot };
-                db.unshift(nr);
-                activeId = nr.id;
+                // 标题变了或者是全新标题：另存为新记录
+                db.unshift({ id: Date.now(), type, title: finalTitle, data, time: new Date().toLocaleString() });
             }
 
+            // 4. 持久化并刷新界面
             localStorage.setItem('terminal_db_vfinal', JSON.stringify(db));
-            if (typeof renderHistory === 'function') renderHistory();
+            renderHistoryList();
+            // 更新当前正在操作的标题状态
+            window.currentOpeningTitle = finalTitle;
         }
 
         function getSnapshot(type) {
@@ -528,17 +588,6 @@
             else alert("至少得留一个吧");
         }
 
-        // 对比模式
-        // function addCritField(n, w) {
-        //     const div = document.createElement('div'); div.className = 'crit-card';
-        //     div.innerHTML = `<div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-        //     <input type="text" class="c-n" value="${n}" placeholder="标准(如：价格)" oninput="checkLen(this, 30)" style="border:none; background:none; outline:none; font-weight:bold; width:80%;">
-        //     <span class="del-btn" onclick="removeCrit(this)">✕</span></div>
-        //     <div style="font-size:11px; display:flex; gap:10px; align-items:center;">权重: <input type="range" class="c-w" value="${w}" style="flex:1" oninput="this.nextElementSibling.innerText=this.value+'%'"><span>${w}%</span></div>`;
-        //     document.getElementById('crit-list').appendChild(div);
-        // }
-        // function removeCrit(el) { if (canDelete('crit-list', 1)) el.closest('.crit-card').remove(); }
-
         function addCritField(n = "", w = 50) {
             const div = document.createElement('div');
             div.className = 'crit-card'; // 恢复原本的类名
@@ -564,14 +613,7 @@
             }
             el.closest('.crit-card').remove();
         }
-        // function addObjField(n) {
-        //     const div = document.createElement('div'); div.className = 'input-group';
-        //     div.innerHTML = `<input type="text" class="o-n" value="${n}" placeholder="对象名(如：小米)" oninput="checkLen(this, 30)" style="flex:1;">
-        //     <span class="del-btn" onclick="removeObj(this)">✕</span>`;
-        //     document.getElementById('obj-list').appendChild(div);
-        // }
 
-        // function removeObj(el) { if (canDelete('obj-list', 2)) el.closest('.input-group').remove(); }
         function addObjField(n = "") {
             const div = document.createElement('div');
             div.className = 'input-group';
@@ -590,60 +632,6 @@
             el.closest('.input-group').remove();
         }
         function toggleScoring(show) { document.getElementById('adv-setup').classList.toggle('hidden', show); document.getElementById('adv-scoring-ui').classList.toggle('hidden', !show); }
-
-        // function goScoringPage() {
-        //     const crits = [...document.querySelectorAll('.c-n')].map((el, i) => ({ n: el.value, w: document.querySelectorAll('.c-w')[i].value }));
-        //     const objs = [...document.querySelectorAll('.o-n')].map(el => el.value);
-        //     if (objs.length < 2) return alert("至少两个对象才能对比哦");
-
-        //     document.getElementById('scoring-matrix').innerHTML = objs.map((o, oi) => `<div class="crit-card"><h4 style="margin:0 0 10px; color:var(--primary)">对 ${o} 打分</h4>
-        //     ${crits.map((c, ci) => {
-        //         const s = currentMatrixData[`${oi}-${ci}`] || 3;
-        //         return `<div style="margin-bottom:12px; font-size:12px; color:#666;">${c.n} (${c.w}%权重)
-        //             <div class="star-group" data-o="${oi}" data-c="${ci}" data-score="${s}">${[1, 2, 3, 4, 5].map(v => `<div class="star-box ${v <= s ? 'active' : ''}" onclick="setStar(this, ${v})">★</div>`).join('')}</div>
-        //         </div>`}).join('')}</div>`).join('');
-        //     toggleScoring(true);
-        // }
-
-        // function goScoringPage() {
-        //     // 1. 获取对象和标准
-        //     const objs = [...document.querySelectorAll('.o-n')].map(el => el.value.trim()).filter(v => v);
-        //     const crits = [...document.querySelectorAll('.c-n')].map((el, i) => {
-        //         const weightEl = document.querySelectorAll('.c-w')[i];
-        //         return {
-        //             n: el.value.trim(),
-        //             w: weightEl ? parseInt(weightEl.value) || 0 : 0
-        //         };
-        //     }).filter(c => c.n !== "");
-
-        //     // 2. 严格拦截
-        //     if (objs.length < 2) {
-        //         alert("⚠️ 至少需要两个比较对象。");
-        //         return;
-        //     }
-        //     if (crits.length < 1) {
-        //         alert("⚖️ 请至少添加一个评价标准。");
-        //         return;
-        //     }
-
-        //     // 3. 渲染打分矩阵
-        //     const matrix = document.getElementById('scoring-matrix');
-        //     matrix.innerHTML = objs.map((o, oi) => `
-        // <div class="crit-card">
-        //     <h4 style="margin:0 0 10px; color:var(--primary)">对 ${o} 打分</h4>
-        //     ${crits.map((c, ci) => {
-        //         const s = currentMatrixData[`${oi}-${ci}`] || 3;
-        //         return `
-        //         <div style="margin-bottom:12px; font-size:12px; color:#666;">${c.n} (${c.w}%权重)
-        //             <div class="star-group" data-o="${oi}" data-c="${ci}" data-score="${s}">
-        //                 ${[1, 2, 3, 4, 5].map(v => `<div class="star-box ${v <= s ? 'active' : ''}" onclick="setStar(this, ${v})">★</div>`).join('')}
-        //             </div>
-        //         </div>`
-        //     }).join('')}
-        // </div>`).join('');
-
-        //     toggleScoring(true);
-        // }
 
         function goScoringPage() {
             // --- 核心修复：重置状态 ---
@@ -693,14 +681,6 @@
 
             toggleScoring(true);
         }
-
-        // 随机模式
-        // function addRanField(v) {
-        //     const div = document.createElement('div'); div.className = 'input-group';
-        //     div.innerHTML = `<input type="text" class="r-i" value="${v}" placeholder="选项" oninput="checkLen(this, 30)" style="flex:1"><span class="del-btn" onclick="removeRan(this)">✕</span>`;
-        //     document.getElementById('ran-list').appendChild(div);
-        // }
-        // function removeRan(el) { if (canDelete('ran-list', 2)) el.closest('.input-group').remove(); }
 
         function addRanField(v = "") {
             const div = document.createElement('div');
@@ -893,51 +873,6 @@
             saveToDb('advanced', document.getElementById('adv-title').value, true);
         }
 
-        // function doRandomDecision() {
-        //     const opts = [...document.querySelectorAll('.r-i')].map(el => el.value).filter(v => v);
-        //     if (opts.length < 2) return alert("两个以上选项才能开启随机决策");
-
-        //     const track = document.getElementById('ran-track');
-        //     document.getElementById('ran-machine').classList.remove('hidden');
-
-        //     track.innerHTML = Array(15).fill(opts).flat().map(o =>
-        //         `<div style="height:80px; line-height:80px; text-align:center; color:white; font-weight:bold; font-size:1.2rem;">${o}</div>`
-        //     ).join('');
-
-        //     const winIdx = Math.floor(Math.random() * opts.length);
-        //     track.style.transition = 'none';
-        //     track.style.transform = 'translateY(0)';
-
-        //     setTimeout(() => {
-        //         track.style.transition = 'transform 3s cubic-bezier(0.1, 0, 0.1, 1)';
-        //         track.style.transform = `translateY(-${(opts.length * 12 + winIdx) * 80}px)`;
-        //     }, 50);
-
-        //     // 动画结束后的处理逻辑
-        //     setTimeout(() => {
-        //         const resPanel = document.getElementById('ran-res-panel');
-        //         const title = document.getElementById('ran-title').value.trim();
-        //         const winner = opts[winIdx];
-
-        //         // 1. 渲染核心结果
-        //         let html = `<div style="font-size:1.2rem; font-weight:bold;">✨ 决策结果：${winner}</div>`;
-
-        //         // 2. 【新增】柔性提示：如果标题为空，追加提示小字
-        //         if (!title) {
-        //             html += `
-        //         <div style="margin-top:15px; padding-top:10px; border-top:1px dashed #eee; font-size:11px; color:#aaa; text-align:center;">
-        //         💡 温馨提示：当前未输入标题，本次结果将不会自动保存到历史记录。
-        //         </div>
-        //         `;
-        //         }
-
-        //         resPanel.innerHTML = html;
-
-        //         // 3. 执行保存逻辑
-        //         saveToDb('random', title, true);
-        //     }, 3100);
-        // }
-
         function doRandomDecision() {
             // 1. 严格检查选项数量
             const opts = [...document.querySelectorAll('.r-i')].map(el => el.value.trim()).filter(v => v);
@@ -1055,6 +990,7 @@
 
         function loadHist(i) {
             const h = db[i]; activeId = h.id; h.count = (h.count || 0) + 1;
+            window.currentOpeningTitle = h.title; // 新增：记录当前打开的标题
             localStorage.setItem('terminal_db_vfinal', JSON.stringify(db));
             if (h.type === 'balance') {
                 switchPage('balance'); document.getElementById('bal-title').value = h.title;
@@ -1073,25 +1009,9 @@
             }
         }
 
-        // 自动存档逻辑:如果结果面板是显示状态，且标题不为空，则触发存档。
+        // 清空自动保存逻辑，不再监听输入框失焦
         function autoSaveAfterTitleInput(type) {
-            const titleInput = document.getElementById(`${type.substring(0, 3)}-title`);
-            const resPanel = document.getElementById(`${type.substring(0, 3)}-res-panel`);
-            const title = titleInput.value.trim();
-
-            if (title && !resPanel.classList.contains('hidden')) {
-                // 1. 打字期间：静默保存内容，不强制检查重名（防止光标跳动）
-                saveToDb(type, title, false);
-
-                // 2. 只有当用户打完字，点击别处时，才处理重名
-                titleInput.onblur = function () {
-                    saveToDb(type, this.value.trim(), true);
-                };
-
-                // 隐藏那个“未存档”的提示
-                const tip = resPanel.querySelector('div[style*="border-top"]');
-                if (tip) tip.style.display = 'none';
-            }
+            // 此处留空
         }
 
         function deleteItem(i) { if (confirm("删除这条记忆吗？")) { db.splice(i, 1); localStorage.setItem('terminal_db_vfinal', JSON.stringify(db)); renderHistoryList(); } }
