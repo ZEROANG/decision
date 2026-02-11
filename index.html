@@ -37,12 +37,49 @@
             margin: 0 auto;
             box-shadow: 0 0 30px rgba(0, 0, 0, 0.05);
             position: relative;
+            padding-top: env(safe-area-inset-top, 20px);
         }
 
-        .page {
-            padding: 20px;
+        /* 修复天平列溢出：让容器支持换行或自适应比例 */
+        .balance-grid {
+            display: flex;
+            /* 建议将 grid 改为 flex */
+            gap: 15px;
+            width: 100%;
             box-sizing: border-box;
+            justify-content: space-between;
+        }
+
+        /* 重点：给天平左右两列各分配 50% 宽度，防止撑破屏幕 */
+        .bal-column {
+            flex: 1;
+            min-width: 0;
+            /* 允许收缩 */
+            width: 48%;
+            /* 稍微小于50%，留出gap */
+            word-break: break-all;
+            /* 强制过长文字换行 */
+        }
+
+        /* 修复对比决策标题栏被遮挡：增加页面顶部的安全距离 */
+        .page {
+            padding-top: 20px;
+            /* 适当增加顶部内边距 */
+            box-sizing: border-box;
+            padding: 20px;
             animation: fadeIn 0.2s ease;
+        }
+
+        /* 移动端特殊适配：当屏幕过窄时调整字体和间距 */
+        @media (max-width: 375px) {
+            h2 {
+                font-size: 1.2rem;
+            }
+
+            .btn-primary {
+                padding: 10px;
+                font-size: 14px;
+            }
         }
 
         @keyframes fadeIn {
@@ -288,6 +325,94 @@
             display: none;
             /* 默认隐藏 */
         }
+
+        /* 弹窗背景遮罩 */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            transition: opacity 0.3s;
+        }
+
+        /* 弹窗主体 */
+        .modal-content {
+            background: white;
+            width: 85%;
+            max-width: 320px;
+            border-radius: 20px;
+            padding: 25px;
+            text-align: center;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            animation: modalPop 0.3s cubic-bezier(0.17, 0.89, 0.32, 1.28);
+        }
+
+        @keyframes modalPop {
+            from {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .modal-text {
+            font-size: 16px;
+            color: var(--text-main);
+            margin-bottom: 25px;
+            line-height: 1.5;
+            font-weight: 500;
+        }
+
+        .modal-btns {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        .modal-btn {
+            padding: 10px 24px;
+            border-radius: 12px;
+            border: none;
+            font-size: 14px;
+            cursor: pointer;
+            transition: 0.2s;
+            font-weight: bold;
+            flex: 1;
+        }
+
+        /* 确认按钮样式 */
+        .modal-btn.confirm {
+            background: var(--primary);
+            color: white;
+        }
+
+        .modal-btn.confirm:active {
+            transform: scale(0.95);
+            opacity: 0.9;
+        }
+
+        /* 取消按钮样式 */
+        .modal-btn.cancel {
+            background: #f1f2f6;
+            color: var(--text-muted);
+        }
+
+        .modal-btn.cancel.hidden {
+            display: none;
+        }
+
+        /* 当只有提示时隐藏取消 */
     </style>
 </head>
 
@@ -318,7 +443,7 @@
                     <p style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">吃什么买什么？交给概率来定夺。</p>
                 </div><span style="color:#ddd; font-size:24px;">›</span>
             </div>
-            <div style="text-align:center; color:#eee; font-size:12px; margin-top:30px;">版本号：1.0.1</div>
+            <div style="text-align:center; color:#eee; font-size:12px; margin-top:30px;">版本号：1.0.2</div>
 
         </div>
 
@@ -415,6 +540,19 @@
         </div>
     </div>
 
+    <!-- <div id="custom-toast" class="hidden"
+        style="position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(0,0,0,0.8); color:white; padding:15px 25px; border-radius:30px; z-index:9999; text-align:center; min-width:200px; box-shadow:0 10px 30px rgba(0,0,0,0.2); pointer-events:none; transition: opacity 0.3s;">
+    </div> -->
+
+    <div id="custom-modal-overlay" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div id="modal-body" class="modal-text">提示内容</div>
+            <div id="modal-footer" class="modal-btns"><button id="modal-cancel-btn"
+                    class="modal-btn cancel">取消</button><button id="modal-confirm-btn"
+                    class="modal-btn confirm">确定</button></div>
+        </div>
+    </div>
+
     <script>
         let db = JSON.parse(localStorage.getItem('terminal_db_vfinal') || '[]');
         let activeId = null;
@@ -432,45 +570,13 @@
         function checkLen(el, max) {
             if (el.value.length > max) {
                 el.value = el.value.substring(0, max);
-                alert(`字数上限为 ${max} 字哦`);
+                openModal(`❌ 字数上限为 ${max} 字哦`);
             }
         }
 
         function canDelete(containerId, min) {
             return document.getElementById(containerId).children.length > min;
         }
-
-        // function saveToDb(type, title, isFinal = false) {
-        //     if (!title) return;
-        //     const snapshot = getSnapshot(type);
-        //     let idx = db.findIndex(item => item.id === activeId);
-
-        //     let finalTitle = title;
-        //     // 只有在 isFinal 为 true（失去焦点或手动保存）时才执行重名检查和改名
-        //     if (isFinal) {
-        //         let counter = 1;
-        //         while (db.some(item => item.title === finalTitle && item.id !== activeId)) {
-        //             finalTitle = `${title}(${counter})`;
-        //             counter++;
-        //         }
-        //         // 更新 UI
-        //         const inputEl = document.getElementById(`${type.substring(0, 3)}-title`);
-        //         if (inputEl) inputEl.value = finalTitle;
-        //     }
-
-        //     if (idx !== -1) {
-        //         db[idx].title = finalTitle; // 这里使用处理后的名字
-        //         db[idx].time = new Date().toLocaleString();
-        //         db[idx].data = snapshot;
-        //     } else {
-        //         const nr = { id: Date.now(), type, title: finalTitle, time: new Date().toLocaleString(), count: 0, data: snapshot };
-        //         db.unshift(nr);
-        //         activeId = nr.id;
-        //     }
-
-        //     localStorage.setItem('terminal_db_vfinal', JSON.stringify(db));
-        //     if (typeof renderHistory === 'function') renderHistory();
-        // }
 
         function saveToDb(type, title, isFinal) {
             // 只有在 isFinal 为 true（点击按钮）时才执行保存
@@ -585,7 +691,7 @@
         }
         function removeBalItem(el, type) {
             if (canDelete(`${type}-list`, 1)) el.closest('.input-group').remove();
-            else alert("至少得留一个吧");
+            else openModal("⚠️ 至少得留一个吧");
         }
 
         function addCritField(n = "", w = 50) {
@@ -608,7 +714,7 @@
             // 获取当前页面上所有评价标准的数量
             const count = document.querySelectorAll('.crit-card').length;
             if (count <= 1) {
-                alert("⚖️ 请至少保留一个评价标准。");
+                openModal("⚖️ 请至少保留一个评价标准。");
                 return;
             }
             el.closest('.crit-card').remove();
@@ -626,7 +732,7 @@
 
         function removeObj(el) {
             if (document.querySelectorAll('.o-n').length <= 2) {
-                alert("⚠️ 至少需要两个比较对象才能进行对比。");
+                openModal("⚠️ 至少需要两个比较对象才能进行对比。");
                 return;
             }
             el.closest('.input-group').remove();
@@ -653,11 +759,11 @@
             }).filter(c => c.n !== "");
 
             if (objs.length < 2) {
-                alert("⚠️ 至少需要两个比较对象。");
+                openModal("⚠️ 至少需要两个比较对象。");
                 return;
             }
             if (crits.length < 1) {
-                alert("⚖️ 请至少添加一个评价标准。");
+                openModal("⚖️ 请至少添加一个评价标准。");
                 return;
             }
 
@@ -696,11 +802,12 @@
         function removeRan(el) {
             // 检查 .r-i 的数量是否小于等于 2
             if (document.querySelectorAll('.r-i').length <= 2) {
-                alert("🎰 至少需要保留两个选项，否则无法开启随机决策。");
+                openModal("🎰 至少需要保留两个选项，否则无法开启随机决策。");
                 return;
             }
             el.closest('.input-group').remove();
         }
+
 
         // 通用打分
         function setStar(el, v) {
@@ -791,14 +898,7 @@
             `;
 
             panel.innerHTML = `<div style="font-weight:bold; font-size:1.1rem;">${msg}</div><small style="color:#888;">综合分差: ${diff > 0 ? '+' + diff : diff}</small>`;
-
-            if (!document.getElementById('bal-title').value) {
-                panel.innerHTML += `
-            <div style="margin-top:15px; padding-top:10px; border-top:1px dashed #eee; font-size:11px; color:#aaa; text-align:center;">
-                💡 温馨提示：当前未输入标题，本次结果将不会自动保存到历史记录。
-            </div>
-            `;
-            }
+            panel.innerHTML += getRandomTip(); // 调用随机技巧函数
 
             saveToDb('balance', document.getElementById('bal-title').value, true);
         }
@@ -861,13 +961,7 @@
             </div>
             `;
 
-            if (!document.getElementById('adv-title').value) {
-                p.innerHTML += `
-            <div style="margin-top:15px; padding-top:10px; border-top:1px dashed #eee; font-size:11px; color:#aaa; text-align:center;">
-                💡 温馨提示：当前未输入标题，本次结果将不会自动保存到历史记录。
-            </div>
-            `;
-            }
+            p.innerHTML += getRandomTip(); // 调用随机技巧函数
 
             // 5. 保存决策
             saveToDb('advanced', document.getElementById('adv-title').value, true);
@@ -877,7 +971,7 @@
             // 1. 严格检查选项数量
             const opts = [...document.querySelectorAll('.r-i')].map(el => el.value.trim()).filter(v => v);
             if (opts.length < 2) {
-                alert("🎰 两个以上选项才能开启随机决策");
+                openModal("🎰 两个以上选项才能开启随机决策");
                 return; // 拦截并退出
             }
 
@@ -915,9 +1009,7 @@
                 const title = titleInput ? titleInput.value.trim() : "";
 
                 let html = `<div style="font-size:1.2rem; font-weight:bold;">✨ 决策结果：${winner}</div>`;
-                if (!title) {
-                    html += `<div style="margin-top:15px; padding-top:10px; border-top:1px dashed #eee; font-size:11px; color:#aaa; text-align:center;">💡 温馨提示：当前未输入标题，本次结果将不会自动保存。</div>`;
-                }
+                html += getRandomTip(); // 调用随机技巧函数
 
                 resPanel.innerHTML = html;
                 resPanel.classList.remove('hidden'); // 显示结果
@@ -1014,9 +1106,67 @@
             // 此处留空
         }
 
-        function deleteItem(i) { if (confirm("删除这条记忆吗？")) { db.splice(i, 1); localStorage.setItem('terminal_db_vfinal', JSON.stringify(db)); renderHistoryList(); } }
+        // 找到 deleteItem 函数进行修改
+        function deleteItem(i) {
+            openModal("⚠️ 确定要删除这条决策吗？", () => {
+                db.splice(i, 1);
+                localStorage.setItem('terminal_db_vfinal', JSON.stringify(db));
+                renderHistoryList();
+            });
+        }
+
+        // function deleteItem(i) { if (confirm("删除这条记忆吗？")) { db.splice(i, 1); localStorage.setItem('terminal_db_vfinal', JSON.stringify(db)); renderHistoryList(); } }
         function getModeName(t) { return { balance: '天平决策', advanced: '对比决策', random: '随机决策' }[t]; }
         function getModeColor(t) { return { balance: 'var(--secondary)', advanced: 'var(--primary)', random: 'var(--accent)' }[t]; }
+
+        /**
+        * @param {string} msg 提示文字
+        * @param {function} onConfirm 确定后的回调（如果不传，则只显示确定按钮，相当于alert）
+        */
+        function openModal(msg, onConfirm = null) {
+            const overlay = document.getElementById('custom-modal-overlay');
+            const modalBody = document.getElementById('modal-body');
+            const confirmBtn = document.getElementById('modal-confirm-btn');
+            const cancelBtn = document.getElementById('modal-cancel-btn');
+
+            modalBody.innerText = msg;
+            overlay.classList.remove('hidden');
+
+            // 如果没有传回调，说明只是普通警告，隐藏取消按钮
+            if (!onConfirm) {
+                cancelBtn.classList.add('hidden');
+                confirmBtn.style.width = '100%';
+            } else {
+                cancelBtn.classList.remove('hidden');
+                confirmBtn.style.width = 'auto';
+            }
+
+            // 确定按钮逻辑
+            confirmBtn.onclick = () => {
+                overlay.classList.add('hidden');
+                if (onConfirm) onConfirm();
+            };
+
+            // 取消按钮逻辑
+            cancelBtn.onclick = () => {
+                overlay.classList.add('hidden');
+            };
+        }
+
+        const userTips = [
+            "💡 温馨提示：长按历史记录可以快速查看决策详情。",
+            "💡 技巧：权重设置得越极端，对比结论的倾向性就越明显。",
+            "💡 技巧：如果结果不满意，说明你心里早有答案，听从内心吧。",
+            "💡 技巧：尝试在不同时间点进行同一决策，看心境的变化。",
+            "💡 技巧：随机模式不仅能选吃的，还能决定谁去洗碗。"
+        ];
+
+        // 获取随机提示的函数
+        function getRandomTip() {
+            const index = Math.floor(Math.random() * userTips.length);
+            return `<div class="user-skill-tip" style="margin-top:15px; padding-top:10px; border-top:1px dashed #eee; font-size:11px; color:var(--text-muted); text-align:center;">${userTips[index]}</div>`;
+        }
+
     </script>
 </body>
 
